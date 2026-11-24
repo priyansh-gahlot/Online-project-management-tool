@@ -1,57 +1,56 @@
 package com.smartprojectmanager.filter;
 
+import com.smartprojectmanager.dao.UserDAO;
 import com.smartprojectmanager.model.User;
-
-import javax.servlet.Filter;
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.annotation.WebFilter;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 import java.io.IOException;
+import java.util.UUID;
+import javax.servlet.*;
+import javax.servlet.annotation.WebFilter;
+import javax.servlet.http.*;
 
 @WebFilter("/*")
 public class AuthFilter implements Filter {
-
-    @Override
-    public void init(FilterConfig filterConfig) throws ServletException {}
-
-    @Override
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
-            throws IOException, ServletException {
-        
-        HttpServletRequest httpRequest = (HttpServletRequest) request;
-        HttpServletResponse httpResponse = (HttpServletResponse) response;
-        
-        String path = httpRequest.getRequestURI().substring(httpRequest.getContextPath().length());
-        
-        // Allow public paths
-        if (path.startsWith("/assets/") || path.equals("/login.jsp") || path.equals("/register.jsp") || path.startsWith("/auth/")) {
-            chain.doFilter(request, response);
-            return;
-        }
-
-        HttpSession session = httpRequest.getSession(false);
-        boolean loggedIn = (session != null && session.getAttribute("user") != null);
-
-        if (loggedIn) {
-            // Check for admin paths
-            User user = (User) session.getAttribute("user");
-            if (path.startsWith("/admin/") && !user.getRole().equals("ADMIN")) {
-                httpResponse.sendError(HttpServletResponse.SC_FORBIDDEN, "Access Denied");
-                return;
-            }
-            chain.doFilter(request, response);
-        } else {
-            // Not logged in, redirect to login
-            httpResponse.sendRedirect(httpRequest.getContextPath() + "/login.jsp");
-        }
+  @Override
+  public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
+      throws IOException, ServletException {
+    HttpServletRequest r = (HttpServletRequest) req;
+    HttpServletResponse s = (HttpServletResponse) res;
+    s.setHeader("X-Content-Type-Options", "nosniff");
+    s.setHeader("X-Frame-Options", "DENY");
+    s.setHeader("Referrer-Policy", "same-origin");
+    String path = r.getRequestURI().substring(r.getContextPath().length());
+    if (path.startsWith("/assets/")
+        || path.equals("/login.jsp")
+        || path.equals("/register.jsp")
+        || path.equals("/auth/verify")
+        || path.equals("/auth/demo")) {
+      chain.doFilter(req, res);
+      return;
     }
-
-    @Override
-    public void destroy() {}
+    HttpSession session = r.getSession(false);
+    User u = session == null ? null : (User) session.getAttribute("user");
+    if (u != null) {
+      u = new UserDAO().getUserByFirebaseUid(u.getFirebaseUid());
+      if (u != null) session.setAttribute("user", u);
+    }
+    if (u == null) {
+      if (path.startsWith("/api/")) {
+        s.setStatus(401);
+        s.setContentType("application/json");
+        s.getWriter().print("{\"error\":\"Please sign in again.\"}");
+      } else s.sendRedirect(r.getContextPath() + "/login.jsp");
+      return;
+    }
+    if (session.getAttribute("csrf") == null)
+      session.setAttribute("csrf", UUID.randomUUID().toString());
+    if ("POST".equals(r.getMethod())
+        && !session.getAttribute("csrf").equals(r.getHeader("X-CSRF-Token"))) {
+      s.setStatus(403);
+      s.setContentType("application/json");
+      s.getWriter().print("{\"error\":\"Session check failed. Reload the page and try again.\"}");
+      return;
+    }
+    s.setHeader("Cache-Control", "no-store");
+    chain.doFilter(req, res);
+  }
 }

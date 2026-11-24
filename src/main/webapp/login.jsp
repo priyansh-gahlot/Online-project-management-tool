@@ -2,6 +2,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta name="app-context" content="${pageContext.request.contextPath}">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Smart Project Manager</title>
@@ -12,6 +13,17 @@
         <div class="auth-card">
             <h2>Welcome Back</h2>
             <p class="auth-subtitle">Sign in to Smart Project Manager</p>
+            <% if (com.smartprojectmanager.util.Settings.demo()) { %>
+            <div class="demo-box">
+                <strong>Explore the working demo</strong>
+                <p>Sample data, real database persistence. Choose a role to try its permissions.</p>
+                <form action="${pageContext.request.contextPath}/auth/demo" method="post" class="demo-roles">
+                    <button name="role" value="admin" class="btn">Administrator</button>
+                    <button name="role" value="manager" class="btn">Project manager</button>
+                    <button name="role" value="member" class="btn">Team member</button>
+                </form>
+            </div>
+            <% } %>
             
             <div id="error-message" class="alert alert-error" style="display: none;"></div>
             

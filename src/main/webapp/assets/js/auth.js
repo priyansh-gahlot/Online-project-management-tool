@@ -23,7 +23,8 @@ async function authenticateBackend(user, fullName = null) {
             formData.append('fullName', fullName);
         }
 
-        const response = await fetch('/smart-project-manager/auth/verify', {
+        const base = document.querySelector('meta[name="app-context"]').content;
+        const response = await fetch(base + '/auth/verify', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
@@ -33,7 +34,7 @@ async function authenticateBackend(user, fullName = null) {
 
         const data = await response.json();
         if (response.ok && data.success) {
-            window.location.href = '/smart-project-manager' + data.redirect;
+            window.location.href = base + data.redirect;
         } else {
             showError(data.error || 'Backend authentication failed.');
             await auth.signOut();
@@ -64,6 +65,7 @@ if (loginForm) {
         } catch (error) {
             console.error('Login error:', error);
             showError(error.message);
+        } finally {
             btn.disabled = false;
             btn.textContent = 'Sign In';
         }
@@ -90,6 +92,7 @@ if (registerForm) {
         } catch (error) {
             console.error('Registration error:', error);
             showError(error.message);
+        } finally {
             btn.disabled = false;
             btn.textContent = 'Sign Up';
         }
